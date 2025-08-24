@@ -4,6 +4,9 @@ import Combine
 import UserNotifications
 
 class TimerViewModel: ObservableObject {
+    // Shared instance
+    static let shared = TimerViewModel()
+    
     // Timer properties
     @Published var timeRemaining: TimeInterval = 300
     @Published var selectedTime: TimeInterval = 300
@@ -14,9 +17,37 @@ class TimerViewModel: ObservableObject {
     @Published var stopwatchTime: TimeInterval = 0
     @Published var isStopwatchRunning = false
     private var stopwatchTimer: AnyCancellable?
+    
+    // Menu bar update timer
+    var menuBarUpdateTimer: AnyCancellable?
+    var menuBarUpdateCallback: ((String) -> Void)?
 
     init() {
         requestNotificationPermission()
+        setupMenuBarUpdates()
+    }
+    
+    private func setupMenuBarUpdates() {
+        // Update the menu bar every half second to avoid excessive updates
+        menuBarUpdateTimer = Timer.publish(every: 0.5, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self = self else { return }
+                
+                // Only update if we have a callback
+                if let callback = self.menuBarUpdateCallback {
+                    if self.isRunning {
+                        // Show timer in menu bar when running
+                        callback(self.timeRemaining.menuBarString())
+                    } else if self.isStopwatchRunning {
+                        // Show stopwatch in menu bar when running
+                        callback(self.stopwatchTime.menuBarString())
+                    } else {
+                        // Clear the menu bar text when nothing is running
+                        callback("")
+                    }
+                }
+            }
     }
 
     // Timer methods
